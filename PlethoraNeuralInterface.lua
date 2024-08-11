@@ -1,125 +1,71 @@
---CONFIG lel
--- Mobs to Search for when using Mob Scanner/Aimbot in format "Creeper"
-local mobNames = { "Creeper", "Skeleton", "Zombie" } 
+-- CONFIGURATION
+local mobNames = { "Creeper", "Skeleton", "Zombie" }  -- Mobs to search for with Mob Scanner/Aimbot
+local oreNames = { "minecraft:diamond_ore", "minecraft:emerald_ore" }  -- Ores to search for with Ore Scanner
+local preferredMethod = "modem"  -- Notification method: "modem", "chatModule", "printOnly"
+local modemPort = 1337  -- Modem port
+local notificationPosStyle = "relativeDirection"  -- Position format: "relativeXYZ", "relativeDirection"
 
--- Ore to search for when using the Ore Scanner in format "minecraft:diamond_ore"
-local oreNames = { "minecraft:diamond_ore", "minecraft:emerald_ore" }
-
--- Method to notify the player; Options: "modem", "chatModule", "printOnly"
-local preferredMethod = "modem"
-
--- Port for the Modem to use
-local modemPort = 1337
-
--- Format of postions in notifications Options: "relativeXYZ", "relativeDirection"
-local notificationPosStyle = "relativeDirection"
-
---KEYS:
-local launchUpKey = {}
-launchUpKey.key = keys.e
-launchUpKey.keyname = "E"
-local launchDirectionKey = {}
-launchDirectionKey.key = keys.f
-launchDirectionKey.keyname = "F"
-local mobScanKey = {}
-mobScanKey.key = keys.numPad9
-mobScanKey.keyname = "NumPad9"
-local useSpamKey = {}
-useSpamKey.key = keys.numPad8
-useSpamKey.keyname = "NumPad8"
-local aimbotKey = {}
-aimbotKey.key = keys.numPad7
-aimbotKey.keyname = "NumPad7"
-local noFallKey = {}
-noFallKey.key = keys.numPad6
-noFallKey.keyname = "NumPad6"
-local hoverKey = {}
-hoverKey.key = keys.numPad5
-hoverKey.keyname = "NumPad5"
-local oreScanKey = {}
-oreScanKey.key = keys.numPad4
-oreScanKey.keyname = "NumPad4"
+-- KEY BINDINGS
+local launchUpKey = { key = keys.e, keyname = "E" }
+local launchDirectionKey = { key = keys.f, keyname = "F" }
+local mobScanKey = { key = keys.numPad9, keyname = "NumPad9" }
+local useSpamKey = { key = keys.numPad8, keyname = "NumPad8" }
+local aimbotKey = { key = keys.numPad7, keyname = "NumPad7" }
+local noFallKey = { key = keys.numPad6, keyname = "NumPad6" }
+local hoverKey = { key = keys.numPad5, keyname = "NumPad5" }
+local oreScanKey = { key = keys.numPad4, keyname = "NumPad4" }
 
 ---------------------------------------------------
 local modules = peripheral.find("neuralInterface")
 if not modules then
-	error("Must have a neural interface", 0)
+	error("A neural interface is required", 0)
 end
 
+-- Setup notification method
 if preferredMethod == "modem" then
-	--Modem
-	modem = peripheral.find("modem")
+	local modem = peripheral.find("modem")
 	if not modem then
-		error("Must have a modem", 0)
+		error("A modem is required", 0)
 	end
 	modem.open(modemPort)
-	if modem.isOpen(modemPort) == false then
-		error("Can't open Port", 0)
+	if not modem.isOpen(modemPort) then
+		error("Unable to open the modem port", 0)
 	end
 elseif preferredMethod == "chatModule" then
-	--Chat Module
-	if not modules.hasModule("plethora:chat", 0) then
-		error("Must have a Chat Module", 0)
+	if not modules.hasModule("plethora:chat") then
+		error("A chat module is required", 0)
 	end
 end
 
-local hasSensor = true
-local hasKinetic = true
-local hasScanner = true
-local hasIntrospection = true
+-- Check installed modules
+local hasSensor = modules.hasModule("plethora:sensor")
+local hasKinetic = modules.hasModule("plethora:kinetic")
+local hasScanner = modules.hasModule("plethora:scanner")
+local hasIntrospection = modules.hasModule("plethora:introspection")
 
-if not modules.hasModule("plethora:sensor", 0) then hasSensor = false end
-if not modules.hasModule("plethora:kinetic", 0) then hasKinetic = false end
-if not modules.hasModule("plethora:scanner", 0) then hasScanner = false end
-if not modules.hasModule("plethora:introspection", 0) then hasIntrospection = false end
+-- FEATURES
+local features = {
+	mobscan = { enabled = false, name = "Mob Scanner", event = "mobscan" },
+	use = { enabled = false, name = "Use Spam", event = "use" },
+	aimbot = { enabled = false, name = "Aimbot", event = "aimbot" },
+	nofall = { enabled = false, name = "No Fall", event = "nofall" },
+	orescan = { enabled = false, name = "Ore Scanner", event = "orescan" },
+	hover = { enabled = false, name = "Hover", event = "hover" }
+}
 
- 
---Bools
-local meta = {}
-
-local mobscan = {}
-mobscan.enabled = false
-mobscan.name = "Mob Scanner"
-mobscan.event = "mobscan"
-
-local use = {}
-use.enabled = false
-use.name = "Use Spam"
-use.event = "use"
-
-local aimbot = {}
-aimbot.enabled = false
-aimbot.name = "Aimbot"
-aimbot.event = "aimbot"
-
-local nofall = {}
-nofall.enabled = false
-nofall.name = "No Fall"
-nofall.event = "nofall"
-
-local orescan = {}
-orescan.enabled = false
-orescan.name = "Ore Scanner"
-orescan.event = "orescan"
-
-local hover = {}
-hover.enabled = false
-hover.name = "Hover"
-hover.event = "hover"
- 
-
+-- Lookup tables
 local mobLookup = {}
-for i = 1, #mobNames do
-	mobLookup[mobNames[i]] = true
+for _, mobName in ipairs(mobNames) do
+	mobLookup[mobName] = true
 end
 
 local oreLookup = {}
-for i = 1, #oreNames do
-	oreLookup[oreNames[i]] = true
+for _, oreName in ipairs(oreNames) do
+	oreLookup[oreName] = true
 end
 
---Helper Functions
-function tell(message)
+-- Helper functions
+local function tell(message)
 	if message then
 		print(message)
 		if preferredMethod == "modem" then
@@ -131,359 +77,237 @@ function tell(message)
 	end
 end
 
-local function toggle(array)
-	array.enabled = not array.enabled
-	tell(array.name .. " was set to " .. tostring(array.enabled))
-	if array.enabled then 
-		os.queueEvent(array.event)
+local function toggle(feature)
+	feature.enabled = not feature.enabled
+	tell(feature.name .. " was set to " .. tostring(feature.enabled))
+	if feature.enabled then 
+		os.queueEvent(feature.event)
 	end
 end
 
-local function getDirection(array)
+local function getDirection(position)
 	local pos = {}
 	if notificationPosStyle == "relativeDirection" then
-		if array.x < 0 then
-			pos.x = "West: "
-		else
-			pos.x = "East: "
-		end
+		pos.x = position.x < 0 and "West: " or "East: "
 		pos.y = ", Height: "
-		if array.z < 0 then
-			pos.z = ", North: "
-		else
-			pos.z = ", South: "
-		end
-	else --If relativeXYZ just return the normal values
-		pos.x = "X: "
-		pos.y = ", Y: "
-		pos.z = ", Z: "
+		pos.z = position.z < 0 and ", North: " or ", South: "
+	else
+		pos.x, pos.y, pos.z = "X: ", ", Y: ", ", Z: "
 	end
 	return pos
 end
 
-local function getPosition(array)
+local function getPosition(position)
 	local pos = {}
 	if notificationPosStyle == "relativeDirection" then
-		if array.x < 0 then
-			pos.x = array.x * -1
-		else
-			pos.x = array.x
-		end
-		pos.y = array.y
-		if array.z < 0 then
-			pos.z = array.z * -1
-		else
-			pos.z = array.z
-		end
-		return pos
-	else --If relativeXYZ just return the normal values
-		return array
+		pos.x = math.abs(position.x)
+		pos.y = position.y
+		pos.z = math.abs(position.z)
+	else
+		pos = position
 	end
-	return array
+	return pos
 end
 
 local function look(entity)
 	local x, y, z = entity.x, entity.y, entity.z
 	local pitch = -math.atan2(y, math.sqrt(x * x + z * z))
 	local yaw = math.atan2(-x, z)
-
 	modules.look(math.deg(yaw), math.deg(pitch))
 end
 
 local function distance(mob)
-	local a = mob.x^2 + mob.y^2 + mob.z^2
-	return math.sqrt(a)
+	return math.sqrt(mob.x^2 + mob.y^2 + mob.z^2)
 end
 
-local function findNearest(array)
-	local nearestMob = array[1]
-	if #array > 1 then
-		for i=2, #array do
-			if (distance(array[i]) < distance(nearestMob)) then
-				nearestMob = array[i]
-			end
+local function findNearest(entities)
+	local nearest = entities[1]
+	for i = 2, #entities do
+		if distance(entities[i]) < distance(nearest) then
+			nearest = entities[i]
 		end
 	end
-	return nearestMob
+	return nearest
 end
 
 local function clearScreen()
-	term.setBackgroundColor(colours.black)  -- Set the background colour to black.
-	term.clear()                            -- Paint the entire display with the current background colour.
-	term.setCursorPos(1,1)                  -- Move the cursor to the top left position.
+	term.setBackgroundColor(colors.black)
+	term.clear()
+	term.setCursorPos(1,1)
 end
- 
--- Start Main Loop
+
+-- Main Loop
 parallel.waitForAny(
-	--- This loop just pulls user input. It handles a couple of function keys, as well as
-	--- setting the "hover" field to true/false.
-	function()
+	function() -- Handle user input
 		while true do
 			local event, key = os.pullEvent("key")
-			if key == launchUpKey.key then
-				if hasKinetic then
-					modules.launch(0, -90, 3)
-				else
-					tell("No Kinetic Module installed; Feature Disabled")
-				end
-			elseif key == launchDirectionKey.key then
-			   if hasKinetic then
-					modules.launch(meta.yaw, meta.pitch, 3)
-				else
-					tell("No Kinetic Module installed; Feature Disabled")
-				end
-			elseif key == mobScanKey.key then
-				if hasSensor then
-					toggle(mobscan)
-				else
-					tell("No Entity Sensor installed; Feature Disabled")
-				end
-			elseif key == useSpamKey.key then
-				if hasKinetic then
-					toggle(use)
-				else
-					tell("No Kinetic Module installed; Feature Disabled")
-				end
-			elseif key == aimbotKey.key then
-				if hasSensor and hasKinetic then
-					toggle(aimbot)
-				else
-					tell("Feature needs to have Kinetic Module and Entity Sensor installed; Feature Disabled")
-				end
-			elseif key == noFallKey.key then
-				if hasKinetic and hasScanner and hasIntrospection then
-					toggle(nofall)
-				else
-					tell("Feature needs to have Kinetic-, Introspection Module and Block Scanner installed; Feature Disabled")
-				end
-			elseif key == hoverKey.key then
-				if hasKinetic and hasIntrospection then
-					toggle(hover)
-				else
-					tell("Feature needs to have Kinetic and Introspection Module installed; Feature Disabled")
-				end
-			elseif key == oreScanKey.key then
-				if hasScanner then
-					toggle(orescan)
-				else
-					tell("No Block Scanner installed; Feature Disabled")
-				end
+			if key == launchUpKey.key and hasKinetic then
+				modules.launch(0, -90, 3)
+			elseif key == launchDirectionKey.key and hasKinetic then
+				modules.launch(meta.yaw, meta.pitch, 3)
+			elseif key == mobScanKey.key and hasSensor then
+				toggle(features.mobscan)
+			elseif key == useSpamKey.key and hasKinetic then
+				toggle(features.use)
+			elseif key == aimbotKey.key and hasSensor and hasKinetic then
+				toggle(features.aimbot)
+			elseif key == noFallKey.key and hasKinetic and hasScanner and hasIntrospection then
+				toggle(features.nofall)
+			elseif key == hoverKey.key and hasKinetic and hasIntrospection then
+				toggle(features.hover)
+			elseif key == oreScanKey.key and hasScanner then
+				toggle(features.orescan)
+			else
+				tell("Feature not available or missing required modules.")
 			end
 		end
 	end,
-	function() -- Update Meta Data
+	function() -- Update meta data
 		while true do
-			if (hasIntrospection) then
+			if hasIntrospection then
 				meta = modules.getMetaOwner()
 			end
 		end
 	end,
-	function() --Mob Scanner
+	function() -- Mob Scanner
 		while true do
-			if mobscan.enabled then
+			if features.mobscan.enabled then
 				local mobs = modules.sense()
- 
 				local candidates = {}
-				for i = 1, #mobs do
-					local mob = mobs[i]
+				for _, mob in ipairs(mobs) do
 					if mobLookup[mob.name] then
-						candidates[#candidates + 1] = mob
+						table.insert(candidates, mob)
 					end
 				end
- 
 				if #candidates > 0 then
-					if #candidates > 3 then
-						local mobString = candidates[1].name
-						for i=2, #candidates do
-							mobString = mobString .. ", " .. candidates[i].name
-						end
-						if (string.len(mobString) > 70) then mobString = "Too many Mobs" end
-						tell(tostring(#candidates) .. " Mobs found near you: " .. mobString)
-					else
-						for i=1, #candidates do
-							local mob = candidates[i]
-							if mob.y < 5 and mob.y > -5 then
-								local pos = getDirection(mob)
-								local mobpos = getPosition(mob)
-								tell("Mob Scanner | " .. i .. ": " .. mob.name .. " found at " .. pos.x .. mobpos.x .. pos.y .. mobpos.y .. pos.z .. mobpos.z)
-							end
+					for i, mob in ipairs(candidates) do
+						if math.abs(mob.y) < 5 then
+							local pos = getDirection(mob)
+							local mobpos = getPosition(mob)
+							tell("Mob Scanner | " .. i .. ": " .. mob.name .. " found at " .. pos.x .. mobpos.x .. pos.y .. mobpos.y .. pos.z .. mobpos.z)
 						end
 					end
 				end
 				sleep(2)
 			else
-				os.pullEvent(mobscan.event)
+				os.pullEvent(features.mobscan.event)
 			end
 		end
 	end,
 	function() -- Use Spam
 		while true do
-			if use.enabled then
-				if (modules.use(1,"main") == false) then
-					tell("No Block to use")
-					use = false
-					tell("Use Spam was set to " .. tostring(use))
+			if features.use.enabled then
+				if not modules.use(1, "main") then
+					tell("No block to use")
+					features.use.enabled = false
+					tell(features.use.name .. " was set to " .. tostring(features.use.enabled))
 				end
 				sleep(0.5)
 			else
-				os.pullEvent(use.event)
+				os.pullEvent(features.use.event)
 			end
 		end
 	end,
-	function() --Aimbot
+	function() -- Aimbot
 		while true do
-			if aimbot.enabled then
+			if features.aimbot.enabled then
 				local mobs = modules.sense()
- 
 				local candidates = {}
-				for i = 1, #mobs do
-					local mob = mobs[i]
+				for _, mob in ipairs(mobs) do
 					if mobLookup[mob.name] then
-						candidates[#candidates + 1] = mob
+						table.insert(candidates, mob)
 					end
 				end
-
 				if #candidates > 0 then
-					local mob = findNearest(candidates)
-					look(mob)
+					local nearestMob = findNearest(candidates)
+					look(nearestMob)
 					sleep(0.2)
 				end
 			else
-				os.pullEvent(aimbot.event)
+				os.pullEvent(features.aimbot.event)
 			end
 		end
 	end,
 	function() -- No Fall
 		while true do
-			if nofall.enabled then
+			if features.nofall.enabled then
 				local blocks = modules.scan()
 				for y = 0, -8, -1 do
-					-- Scan from the current block downwards
-					local block = blocks[1 + (8 + (8 + y)*17 + 8*17^2)]
+					local block = blocks[1 + (8 + (8 + y) * 17 + 8 * 17^2)]
 					if block.name ~= "minecraft:air" then
 						if meta.motionY < -0.3 then
-							-- If we're moving slowly, then launch ourselves up
 							modules.launch(0, -90, math.min(4, meta.motionY / -0.5))
 						end
-					break
+						break
 					end
 				end
 			else
-				os.pullEvent(nofall.event)
+				os.pullEvent(features.nofall.event)
 			end
 		end
 	end,
 	function() -- Hover
 		while true do
-			if hover.enabled then
-				-- We calculate the required motion we need to take
-				local mY = meta.motionY
-				mY = (mY - 0.138) / 0.8
-
-				-- If it is sufficiently large then we fire ourselves in that direction.
+			if features.hover.enabled then
+				local mY = (meta.motionY - 0.138) / 0.8
 				if mY > 0.5 or mY < 0 then
-					local sign = 1
-					if mY < 0 then sign = -1 end
+					local sign = mY < 0 and -1 or 1
 					modules.launch(0, 90 * sign, math.min(4, math.abs(mY)))
 				else
 					sleep(0)
 				end
 			else
-				os.pullEvent(hover.event)
+				os.pullEvent(features.hover.event)
 			end
 		end
 	end,
 	function() -- Ore Scanner
 		while true do
-			if orescan.enabled then
+			if features.orescan.enabled then
 				local ores = modules.scan()
- 
 				local candidates = {}
-				for i = 1, #ores do
-					local ore = ores[i]
+				for _, ore in ipairs(ores) do
 					if oreLookup[ore.name] then
-						candidates[#candidates + 1] = ore
+						table.insert(candidates, ore)
 					end
 				end
- 
 				if #candidates > 0 then
-					for i=1, #candidates do
-						local ore = candidates[i]
+					for i, ore in ipairs(candidates) do
 						local pos = getDirection(ore)
 						local orepos = getPosition(ore)
 						tell("Ore Scanner | " .. i .. ": " .. ore.name .. " found at " .. pos.x .. orepos.x .. pos.y .. orepos.y .. pos.z .. orepos.z)
 					end
 				else
-					tell("Ore Scanner | No Ores found")
+					tell("Ore Scanner | No ores found")
 				end
-				orescan.enabled = false
+				features.orescan.enabled = false
 			else
-				os.pullEvent(orescan.event)
+				os.pullEvent(features.orescan.event)
 			end
 		end
 	end,
-	function() -- Show Text 
+	function() -- Display Help Text
 		while true do
 			clearScreen()
-			--Launch
-			if (hasKinetic) then
-				term.setTextColor(colors.green)
-				print("Launch Upwards: Press " .. launchUpKey.keyname .. ".")
-				print("Launch in Direction: Press " .. launchDirectionKey.keyname .. ".")
-			else
-				term.setTextColor(colors.red)
-				print("Launch Upwards: Needs Kinetic Module.")
-				print("Launch in Direction: Needs Kinetic Module.")
+			local textColor = {
+				[true] = colors.green,
+				[false] = colors.red
+			}
+
+			local function printFeatureStatus(featureName, keyName, condition, featureDescription)
+				term.setTextColor(textColor[condition])
+				print(featureDescription .. ": Press " .. keyName .. ".")
 			end
-			--Mob Scanner
-			if (hasSensor) then
-				term.setTextColor(colors.green)
-				print("Toggle Mob Scanner: Press " .. mobScanKey.keyname .. ".")
-			else
-				term.setTextColor(colors.red)
-				print("Toggle Mob Scanner: Needs Entity Sensor.")
-			end
-			--Use Spam
-			if (hasKinetic) then
-				term.setTextColor(colors.green)
-				print("Toggle Use Spam: Press " .. useSpamKey.keyname .. ".")
-			else
-				term.setTextColor(colors.red)
-				print("Toggle Use Spam: Needs Kinetic Module.")
-			end
-			--Aimbot
-			if (hasKinetic and hasSensor) then
-				term.setTextColor(colors.green)
-				print("Toggle Aimbot: Press " .. aimbotKey.keyname .. ".")
-			else
-				term.setTextColor(colors.red)
-				print("Toggle Aimbot: Needs Kinetic Module and Entity Sensor.")
-			end
-			--NoFall
-			if (hasKinetic and hasScanner and hasIntrospection) then
-				term.setTextColor(colors.green)
-				print("Toggle No Fall Damage: Press " .. noFallKey.keyname .. ".")
-			else
-				term.setTextColor(colors.red)
-				print("Toggle No Fall Damage: Needs Kinetic Module, Block Scanner and Introspection Module.")
-			end
-			--Hoever
-			if (hasKinetic and hasIntrospection) then
-				term.setTextColor(colors.green)
-				print("Toggle Hover: Press " .. hoverKey.keyname .. ".")
-			else
-				term.setTextColor(colors.red)
-				print("Toggle Hover: Needs Kinetic- and Introspection Module.")
-			end
-			--Block Scan
-			if (hasScanner) then
-				term.setTextColor(colors.green)
-				print("Activate Ore Scan: Press " .. oreScanKey.keyname)
-			else
-				term.setTextColor(colors.red)
-				print("Activate Ore Scan: Needs Block Scanner.")
-			end
-			--sleep
+
+			printFeatureStatus("Launch Upwards", launchUpKey.keyname, hasKinetic, "Launch Upwards")
+			printFeatureStatus("Launch Direction", launchDirectionKey.keyname, hasKinetic, "Launch in Direction")
+			printFeatureStatus("Mob Scanner", mobScanKey.keyname, hasSensor, "Toggle Mob Scanner")
+			printFeatureStatus("Use Spam", useSpamKey.keyname, hasKinetic, "Toggle Use Spam")
+			printFeatureStatus("Aimbot", aimbotKey.keyname, hasSensor and hasKinetic, "Toggle Aimbot")
+			printFeatureStatus("No Fall", noFallKey.keyname, hasKinetic and hasScanner and hasIntrospection, "Toggle No Fall Damage")
+			printFeatureStatus("Hover", hoverKey.keyname, hasKinetic and hasIntrospection, "Toggle Hover")
+			printFeatureStatus("Ore Scan", oreScanKey.keyname, hasScanner, "Activate Ore Scan")
+
 			sleep(5)
 		end
 	end
